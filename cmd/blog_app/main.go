@@ -1,4 +1,4 @@
-package blogapp
+package main
 
 import (
 	"github.com/yux77yux/blog-backend/cmd/server"

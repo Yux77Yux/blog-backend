@@ -1,18 +1,20 @@
 package server
 
 import (
-	"github.com/yux77yux/blog-backend/internal/handlers/articles"
-	"github.com/yux77yux/blog-backend/internal/handlers/user"
+	"github.com/yux77yux/blog-backend/api"
+
 	"log"
 	"net/http"
 )
 
 func Server() {
-	user.UserHandlers()
+	mux := http.NewServeMux()
+	api.UserHandlers(mux)
 
-	articles.ArticlesHandlers()
+	//"github.com/yux77yux/blog-backend/internal/handlers/articles"
+	//articles.ArticlesHandlers()
 
-	if err := http.ListenAndServe(":3001", nil); err != nil {
-		log.Fatal("Server failed to start:", err)
+	if err := http.ListenAndServe(":3001", mux); err != nil {
+		log.Println(err)
 	}
 }
