@@ -1,4 +1,4 @@
-package utils
+package ipinfo
 
 import (
 	"encoding/json"

@@ -5,9 +5,11 @@ type UsernameAndPassword struct {
 	Password string
 }
 
-type UserActive struct {
+type UserIncidental struct {
 	//外键，与User.Id联系不要返回这个数据
 	Id int32 `json:"id"`
+	//主键，主要用于被搜索，生成后不可更改
+	Uid string `json:"uid"`
 	//昵称，也可用于被搜索，允许可以更改
 	Name string `json:"name"`
 	//头像图片地址
@@ -16,12 +18,13 @@ type UserActive struct {
 	Bio string `json:"bio"`
 	//登录状态
 	Status bool `json:"status"`
+	//主页受欢迎程度，用于优先搜索
+	Popularity float32 `json:"popularity"`
 }
 
-type UserIncidental struct {
-	UserActive
-	//主键，主要用于被搜索，生成后不可更改
-	Uid string `json:"uid"`
-	//主页受欢迎程度，用于优先搜索
-	Popularity int32 `json:"popularity"`
+type UserModify struct {
+	Id      int32  `json:"id"`
+	Name    string `json:"name"`
+	Profile string `json:"profile"`
+	Bio     string `json:"bio"`
 }

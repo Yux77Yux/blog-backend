@@ -1,4 +1,4 @@
-package utils
+package databaseutils
 
 import (
 	"database/sql"
@@ -8,7 +8,8 @@ import (
 )
 
 func CreateTables() {
-	db, err := sql.Open("mysql", "sa:x123@(192.168.101.4:3306)/")
+	db, err := sql.Open("mysql", "sa:x123@(127.0.0.1:13306)/")
+	// db, err := sql.Open("mysql", "sa:x123@(192.168.101.4:3306)/")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,7 +44,7 @@ CREATE TABLE if not exists user(
 CREATE TABLE if not exists user_incidental(
 	uid char(9), -- 主键，主要用于被搜索，生成后不可更改
 	id INT NOT NULL,
-	name VARCHAR(100), -- 昵称，也可用于被搜索，允许可以更改
+	name VARCHAR(100) DEFAULT '新用户', -- 昵称，也可用于被搜索，允许可以更改
     bio TEXT,  -- 个性签名
     profile TEXT,  -- 头像图片地址
     status TINYINT(1) not null default 0,  -- 登录状态
