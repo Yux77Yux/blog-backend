@@ -168,11 +168,12 @@ func FetchLatestUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
-func UpdateUser(w http.ResponseWriter, r *http.Request) {
+func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 
 	// Parse the form to retrieve the file and other fields
 	err := r.ParseMultipartForm(10 << 21) // Limit your file size to 10 MB
@@ -193,7 +194,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	var file_name string
 	var profile_path string
-	file, _, err := r.FormFile("profile")
+	file, fileHeader, err := r.FormFile("profile")
 	if err != nil {
 		log.Println("Error retrieving file:", err)
 		profile_path = ""
@@ -204,7 +205,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	} else {
 		defer file.Close()
 
-		file_name = "/images/profiles/" + "profile_" + idStr + ".jpg"
+		file_name = "images/profiles/" + fileHeader.Filename
 		profile_path, err = aliyun.UploadFile(file, file_name)
 		if err != nil {
 			log.Println("Error uploading file:", err)
@@ -216,30 +217,12 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Retrieve the 'id', 'name', and 'bio' fields from the form
-
-	name := r.FormValue("name")
-	bio := r.FormValue("bio")
-
-	modifyInfo := model.UserModify{
+	modify_info := model.UserModifyProfile{
 		Id:      id32,
-		Name:    name,
 		Profile: profile_path,
-		Bio:     bio,
 	}
 
-	err = userutils.UpdateUser(modifyInfo)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		response := map[string]string{"err": err.Error()}
-		json.NewEncoder(w).Encode(response)
-		log.Println(err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	result, err := userutils.FetchLatestUser(id)
+	err = userutils.UpdateProfile(modify_info)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := map[string]string{"err": err.Error()}
@@ -249,5 +232,77 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(result)
+	response := map[string]string{"success": "OK!"}
+	json.NewEncoder(w).Encode(response)
+}
+
+func UpdateName(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+
+	var modify_info model.UserModifyName
+
+	if err := json.NewDecoder(r.Body).Decode(&modify_info); err != nil {
+		if err == io.EOF {
+			http.Error(w, "Empty request body", http.StatusBadRequest)
+		} else if syntaxErr, ok := err.(*json.SyntaxError); ok {
+			http.Error(w, fmt.Sprintf("Syntax error at byte offset %d", syntaxErr.Offset), http.StatusBadRequest)
+		} else if unmarshalErr, ok := err.(*json.UnmarshalTypeError); ok {
+			http.Error(w, fmt.Sprintf("Incorrect type for field %s", unmarshalErr.Field), http.StatusBadRequest)
+		} else {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		}
+		return
+	}
+
+	err := userutils.UpdateName(modify_info)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := map[string]string{"err": err.Error()}
+		json.NewEncoder(w).Encode(response)
+		log.Println(err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	response := map[string]string{"success": "OK!"}
+	json.NewEncoder(w).Encode(response)
+}
+
+func UpdateBio(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var modify_info model.UserModifyBio
+
+	if err := json.NewDecoder(r.Body).Decode(&modify_info); err != nil {
+		if err == io.EOF {
+			http.Error(w, "Empty request body", http.StatusBadRequest)
+		} else if syntaxErr, ok := err.(*json.SyntaxError); ok {
+			http.Error(w, fmt.Sprintf("Syntax error at byte offset %d", syntaxErr.Offset), http.StatusBadRequest)
+		} else if unmarshalErr, ok := err.(*json.UnmarshalTypeError); ok {
+			http.Error(w, fmt.Sprintf("Incorrect type for field %s", unmarshalErr.Field), http.StatusBadRequest)
+		} else {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		}
+		return
+	}
+
+	err := userutils.UpdateBio(modify_info)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := map[string]string{"err": err.Error()}
+		json.NewEncoder(w).Encode(response)
+		log.Println(err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	response := map[string]string{"success": "OK!"}
+	json.NewEncoder(w).Encode(response)
 }

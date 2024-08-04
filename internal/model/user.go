@@ -22,9 +22,17 @@ type UserIncidental struct {
 	Popularity float32 `json:"popularity"`
 }
 
-type UserModify struct {
+type UserModifyProfile struct {
 	Id      int32  `json:"id"`
-	Name    string `json:"name"`
 	Profile string `json:"profile"`
-	Bio     string `json:"bio"`
+}
+
+type UserModifyName struct {
+	Id   int32  `json:"id"`
+	Name string `json:"name"`
+}
+
+type UserModifyBio struct {
+	Id  int32  `json:"id"`
+	Bio string `json:"bio"`
 }

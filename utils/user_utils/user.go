@@ -273,7 +273,7 @@ func FetchLatestUser(id int) (model.UserIncidental, error) {
 	return currentUser, nil
 }
 
-func UpdateUser(modify_info model.UserModify) error {
+func UpdateProfile(modify_info model.UserModifyProfile) error {
 	db, err := sql.Open("mysql", config.ConnectionStr)
 	if err != nil {
 		return err
@@ -286,14 +286,76 @@ func UpdateUser(modify_info model.UserModify) error {
 	}
 
 	query := `
-	UPDATE user_incidental.id
-	SET name = ?,
-	SET bio = ?,
-	SET profile = ?,
+	UPDATE user_incidental
+	SET profile = ?
 	WHERE user_incidental.id = ? 
 	`
 
-	_, err = tx.Exec(query, modify_info.Id, modify_info.Bio, modify_info.Profile, modify_info.Id)
+	_, err = tx.Exec(query, modify_info.Profile, modify_info.Id)
+
+	if err != nil {
+		return err
+	}
+
+	// 提交事务
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func UpdateName(modify_info model.UserModifyName) error {
+	db, err := sql.Open("mysql", config.ConnectionStr)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	query := `
+	UPDATE user_incidental
+	SET name = ?
+	WHERE user_incidental.id = ? 
+	`
+
+	_, err = tx.Exec(query, modify_info.Name, modify_info.Id)
+
+	if err != nil {
+		return err
+	}
+
+	// 提交事务
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func UpdateBio(modify_info model.UserModifyBio) error {
+	db, err := sql.Open("mysql", config.ConnectionStr)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	query := `
+	UPDATE user_incidental
+	SET bio = ?
+	WHERE user_incidental.id = ? 
+	`
+
+	_, err = tx.Exec(query, modify_info.Bio, modify_info.Id)
 
 	if err != nil {
 		return err
