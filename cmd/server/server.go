@@ -2,7 +2,7 @@ package server
 
 import (
 	"github.com/yux77yux/blog-backend/api"
-
+	"github.com/yux77yux/blog-backend/utils/log_utils"
 	"log"
 	"net/http"
 )
@@ -16,5 +16,6 @@ func Server() {
 
 	if err := http.ListenAndServe(":3001", mux); err != nil {
 		log.Println(err)
+		log_utils.Logger.Printf("port has already occupied or others: %v", err)
 	}
 }

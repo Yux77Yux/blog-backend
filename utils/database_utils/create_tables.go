@@ -1,10 +1,12 @@
-package databaseutils
+package database_utils
 
 import (
 	"database/sql"
+	"log"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/yux77yux/blog-backend/config"
-	"log"
+	"github.com/yux77yux/blog-backend/utils/log_utils"
 )
 
 func CreateTables() {
@@ -12,17 +14,20 @@ func CreateTables() {
 	// db, err := sql.Open("mysql", "sa:x123@(192.168.101.4:3306)/")
 	if err != nil {
 		log.Fatal(err)
+		log_utils.Logger.Printf("cannot connect to mysql: %v", err)
 	}
 	defer db.Close()
 
 	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS Blog")
 	if err != nil {
 		log.Fatal(err)
+		log_utils.Logger.Printf("exec Blog database failure: %v", err)
 	}
 
 	db, err = sql.Open("mysql", config.ConnectionStr)
 	if err != nil {
 		log.Fatal(err)
+		log_utils.Logger.Printf("cannot connect to mysql database: %v", err)
 	}
 	defer db.Close()
 
@@ -38,6 +43,7 @@ CREATE TABLE if not exists user(
 `
 	if _, err := db.Exec(query); err != nil {
 		log.Fatal(err)
+		log_utils.Logger.Printf("exec user table failure: %v", err)
 	}
 
 	query = `
@@ -47,7 +53,6 @@ CREATE TABLE if not exists user_incidental(
 	name VARCHAR(100) DEFAULT '新用户', -- 昵称，也可用于被搜索，允许可以更改
     bio TEXT,  -- 个性签名
     profile TEXT,  -- 头像图片地址
-    status TINYINT(1) not null default 0,  -- 登录状态
     popularity DECIMAL(10,5), -- 主页受欢迎程度，用于优先搜索
 
 	PRIMARY KEY(uid),
@@ -58,6 +63,7 @@ CREATE TABLE if not exists user_incidental(
 `
 	if _, err := db.Exec(query); err != nil {
 		log.Fatal(err)
+		log_utils.Logger.Printf("create user_incidental table failure: %v", err)
 	}
 
 	query = `
@@ -85,5 +91,6 @@ CREATE TABLE if not exists article(
 `
 	if _, err := db.Exec(query); err != nil {
 		log.Fatal(err)
+		log_utils.Logger.Printf("create article table failure: %v", err)
 	}
 }
