@@ -18,16 +18,18 @@ func SignIn(user model.UsernameAndPassword) (*model.UserIncidental, error) {
 
 	query := `
 	SELECT 
-	user.id
+	user_incidental.uid AS uid
 	FROM user
+	INNER JOIN user_incidental ON user_incidental.id = user.id
 	WHERE user.username = ? 
 	AND user.password = ? 
 	`
 
-	var id int32
+	var uid string
 	err := config.DB.QueryRow(query, user.Username, user.Password).Scan(
-		&id,
+		&uid,
 	)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user_utils SignIn QueryRow: user not found")
@@ -35,19 +37,17 @@ func SignIn(user model.UsernameAndPassword) (*model.UserIncidental, error) {
 		return nil, fmt.Errorf("user_utils SignIn QueryRow: user not found %v", err)
 	}
 
-	err = redis_utils.SetUserOnline(id, true)
+	err = redis_utils.SetUserOnline(uid, true)
 	if err != nil {
 		return nil, fmt.Errorf("user_utils SetUserOnline: setUserOnline failure %v", err)
 	}
 
-	uid := strconv.Itoa(int(id + 100000000))
-
 	var currentUser *model.UserIncidental
 	currentUser, err = redis_utils.GetUserFromRedis(uid)
 	if err != nil {
-		currentUser, err = FetchLatestUser(id)
+		currentUser, err = FetchUser(uid)
 		if err != nil {
-			_ = redis_utils.SetUserOnline(id, false)
+			_ = redis_utils.SetUserOnline(uid, false)
 			return nil, fmt.Errorf("user_utils FetchLatestUser: fetchLatestUser failure %v", err)
 		}
 
@@ -126,20 +126,13 @@ func FetchUser(uid string) (*model.UserIncidental, error) {
 
 	query := `
 	SELECT 
-	user_incidental.id AS id,
-	user_incidental.uid AS uid,
-	user_incidental.name AS name,
-	user_incidental.bio AS bio,
-	user_incidental.profile AS profile,
-	user_incidental.popularity AS popularity
-
-	FROM user_incidental
-	WHERE user_incidental.uid = ? 
+	*
+	FROM view_user
+	WHERE view_user.uid = ? 
 	`
 
 	var currentUser model.UserIncidental
 	err = tx.QueryRow(query, uid).Scan(
-		&currentUser.Id,
 		&currentUser.Uid,
 		&currentUser.Name,
 		&currentUser.Bio,
@@ -158,60 +151,9 @@ func FetchUser(uid string) (*model.UserIncidental, error) {
 		return nil, fmt.Errorf("user_utils FetchUser Commit: %v", err)
 	}
 
-	currentUser.Status, err = redis_utils.GetUserOnline(currentUser.Id)
+	currentUser.Status, err = redis_utils.GetUserOnline(currentUser.Uid)
 	if err != nil {
 		return &currentUser, fmt.Errorf("user_utils FetchUser GetUserOnline: %v", err)
-	}
-
-	return &currentUser, nil
-}
-
-func FetchLatestUser(id int32) (*model.UserIncidental, error) {
-	config.OpenDB()
-	defer config.DB.Close()
-
-	tx, err := config.DB.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("user_utils FetchLatestUser Begin: %v", err)
-	}
-
-	query := `
-	SELECT 
-	user_incidental.id AS id,
-	user_incidental.uid AS uid,
-	user_incidental.name AS name,
-	user_incidental.bio AS bio,
-	user_incidental.profile AS profile,
-	user_incidental.popularity AS popularity
-
-	FROM user_incidental
-	WHERE user_incidental.id = ? 
-	`
-
-	var currentUser model.UserIncidental
-	err = tx.QueryRow(query, id).Scan(
-		&currentUser.Id,
-		&currentUser.Uid,
-		&currentUser.Name,
-		&currentUser.Bio,
-		&currentUser.Profile,
-		&currentUser.Popularity,
-	)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user_utils FetchLatestUser QueryRow ErrNoRows: %v", err)
-		}
-		return nil, fmt.Errorf("user_utils FetchLatestUser QueryRow: %v", err)
-	}
-
-	// 提交事务
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("user_utils FetchLatestUser Commit: %v", err)
-	}
-
-	currentUser.Status, err = redis_utils.GetUserOnline(id)
-	if err != nil {
-		return &currentUser, fmt.Errorf("user_utils FetchLatestUser GetUserOnline: %v", err)
 	}
 
 	return &currentUser, nil
@@ -229,10 +171,10 @@ func UpdateProfile(modify_info *model.UserModifyProfile) error {
 	query := `
 	UPDATE user_incidental
 	SET profile = ?
-	WHERE user_incidental.id = ? 
+	WHERE user_incidental.uid = ? 
 	`
 
-	_, err = tx.Exec(query, modify_info.Profile, modify_info.Id)
+	_, err = tx.Exec(query, modify_info.Profile, modify_info.Uid)
 
 	if err != nil {
 		return fmt.Errorf("user_utils UpdateProfile Exec: %v", err)
@@ -258,10 +200,10 @@ func UpdateName(modify_info *model.UserModifyName) error {
 	query := `
 	UPDATE user_incidental
 	SET name = ?
-	WHERE user_incidental.id = ? 
+	WHERE user_incidental.uid = ? 
 	`
 
-	_, err = tx.Exec(query, modify_info.Name, modify_info.Id)
+	_, err = tx.Exec(query, modify_info.Name, modify_info.Uid)
 
 	if err != nil {
 		return fmt.Errorf("user_utils UpdateName Exec: %v", err)
@@ -287,10 +229,10 @@ func UpdateBio(modify_info *model.UserModifyBio) error {
 	query := `
 	UPDATE user_incidental
 	SET bio = ?
-	WHERE user_incidental.id = ? 
+	WHERE user_incidental.uid = ? 
 	`
 
-	_, err = tx.Exec(query, modify_info.Bio, modify_info.Id)
+	_, err = tx.Exec(query, modify_info.Bio, modify_info.Uid)
 
 	if err != nil {
 		return fmt.Errorf("user_utils UpdateBio Exec: %v", err)

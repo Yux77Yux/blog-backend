@@ -6,8 +6,6 @@ type UsernameAndPassword struct {
 }
 
 type UserIncidental struct {
-	//外键，与User.Id联系不要返回这个数据
-	Id int32 `json:"id"`
 	//主键，主要用于被搜索，生成后不可更改
 	Uid string `json:"uid"`
 	//昵称，也可用于被搜索，允许可以更改
@@ -23,16 +21,16 @@ type UserIncidental struct {
 }
 
 type UserModifyProfile struct {
-	Id      int32  `json:"id"`
+	Uid     string `json:"uid"`
 	Profile string `json:"profile"`
 }
 
 type UserModifyName struct {
-	Id   int32  `json:"id"`
+	Uid  string `json:"uid"`
 	Name string `json:"name"`
 }
 
 type UserModifyBio struct {
-	Id  int32  `json:"id"`
+	Uid string `json:"uid"`
 	Bio string `json:"bio"`
 }

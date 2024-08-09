@@ -6,11 +6,12 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/yux77yux/blog-backend/internal/model"
 	"github.com/yux77yux/blog-backend/utils/aliyun"
+	"github.com/yux77yux/blog-backend/utils/jwt_utils"
 	"github.com/yux77yux/blog-backend/utils/log_utils"
 	"github.com/yux77yux/blog-backend/utils/redis_utils"
 	"github.com/yux77yux/blog-backend/utils/user_utils"
@@ -35,6 +36,11 @@ func jsonDecoder(w http.ResponseWriter, r *http.Request, target interface{}) {
 	}
 }
 
+type UserResponse struct {
+	UserInfo *model.UserIncidental `json:"userInfo"` // 用适当的类型替代 interface{}
+	Token    string                `json:"token"`
+}
+
 func SignIn(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -47,7 +53,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	result, err := user_utils.SignIn(user)
+	userInfo, err := user_utils.SignIn(user)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := map[string]string{"err": err.Error()}
@@ -55,6 +61,16 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error:user SignIn: ", err)
 		log_utils.Logger.Printf("Error:user SignIn: %v", err)
 		return
+	}
+
+	tokenString, err := jwt_utils.GenerateJWT(userInfo.Uid)
+	if err != nil {
+		log.Println("Error:user : ", err)
+	}
+
+	result := UserResponse{
+		UserInfo: userInfo,
+		Token:    tokenString,
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -87,25 +103,44 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func SignOut(w http.ResponseWriter, r *http.Request) {
+func ToBlack(tokenString string) error {
+	token, err := jwt_utils.ParseJWT(tokenString)
+	if err != nil {
+		return fmt.Errorf("ToBlack ParseJWT invalid: %v", err)
+	}
 
+	claims := token.Claims.(jwt.MapClaims)
+	jti, ok := claims["jti"].(string)
+	if !ok {
+		return fmt.Errorf("ToBlack jti invalid")
+	}
+
+	exp, ok := claims["exp"].(float64)
+	if !ok {
+		return fmt.Errorf("ToBlack exp invalid")
+	}
+
+	err = redis_utils.AddJtiToBlacklist(jti, exp)
+	if err != nil {
+		return fmt.Errorf("ToBlack AddJtiToBlacklist invalid: %v", err)
+	}
+
+	return nil
+}
+
+func SignOut(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 
 		return
 	}
 
-	idStr := r.FormValue("id")
-
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid id format", http.StatusBadRequest)
-		return
-	}
+	uid := r.FormValue("uid")
+	tokenString := r.Header.Get("Authorization")
 
 	w.Header().Set("Content-Type", "application/json")
 
-	err = redis_utils.SetUserOnline(int32(id), false)
+	err := redis_utils.SetUserOnline(uid, false)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := map[string]string{"err": err.Error()}
@@ -114,6 +149,17 @@ func SignOut(w http.ResponseWriter, r *http.Request) {
 		log_utils.Logger.Printf("Error:user SignOut: %v", err)
 		return
 	}
+
+	err = ToBlack(tokenString)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := map[string]string{"err": err.Error()}
+		json.NewEncoder(w).Encode(response)
+		log.Println("Error:user SignOut: ", err)
+		log_utils.Logger.Printf("Error:user SignOut: %v", err)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 	response := map[string]string{"success": "Sign out successful"}
 	json.NewEncoder(w).Encode(response)
@@ -171,16 +217,7 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := r.FormValue("id")
-	// 将 idStr 转换为 int 类型
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		// 处理转换错误
-		http.Error(w, "Invalid id format", http.StatusBadRequest)
-		return
-	}
-	uid := strconv.Itoa(id + 100000000)
-	id32 := int32(id)
+	uid := r.FormValue("uid")
 
 	var file_name string
 	var profile_path string
@@ -212,7 +249,7 @@ func UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	modify_info := model.UserModifyProfile{
-		Id:      id32,
+		Uid:     uid,
 		Profile: profile_path,
 	}
 
@@ -251,8 +288,6 @@ func UpdateName(w http.ResponseWriter, r *http.Request) {
 
 	jsonDecoder(w, r, &modify_info)
 
-	uid := strconv.Itoa(int(modify_info.Id + 100000000))
-
 	go (func() {
 		err := user_utils.UpdateName(&modify_info)
 		if err != nil {
@@ -261,7 +296,7 @@ func UpdateName(w http.ResponseWriter, r *http.Request) {
 		}
 	})()
 
-	err := redis_utils.ModifyUserField(uid, "Name", modify_info.Name)
+	err := redis_utils.ModifyUserField(modify_info.Uid, "Name", modify_info.Name)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := map[string]string{"err": err.Error()}
@@ -277,7 +312,6 @@ func UpdateName(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateBio(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != http.MethodPut {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 
@@ -288,8 +322,6 @@ func UpdateBio(w http.ResponseWriter, r *http.Request) {
 
 	jsonDecoder(w, r, &modify_info)
 
-	uid := strconv.Itoa(int(modify_info.Id + 100000000))
-
 	go (func() {
 		err := user_utils.UpdateBio(&modify_info)
 		if err != nil {
@@ -298,7 +330,7 @@ func UpdateBio(w http.ResponseWriter, r *http.Request) {
 		}
 	})()
 
-	err := redis_utils.ModifyUserField(uid, "Bio", modify_info.Bio)
+	err := redis_utils.ModifyUserField(modify_info.Uid, "Bio", modify_info.Bio)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := map[string]string{"err": err.Error()}
@@ -311,4 +343,70 @@ func UpdateBio(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	response := map[string]string{"success": "OK!"}
 	json.NewEncoder(w).Encode(response)
+}
+
+func AutoSignIn(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	tokenString := r.Header.Get("Authorization")
+	if tokenString == "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := map[string]string{"err": "Authorization header is missing"}
+		json.NewEncoder(w).Encode(response)
+		log.Println("Error: Authorization header is missing")
+		return
+	}
+
+	token, err := jwt_utils.ParseJWT(tokenString)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := map[string]string{"err": err.Error()}
+		json.NewEncoder(w).Encode(response)
+		log.Println("Error: ParseJWT: ", err)
+		return
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := map[string]string{"err": "invalid claims"}
+		json.NewEncoder(w).Encode(response)
+		log.Println("Error: Authorization header is missing")
+		return
+	}
+
+	uid, ok := claims["sub"].(string)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := map[string]string{"err": "sub claim is missing or not a string"}
+		json.NewEncoder(w).Encode(response)
+		log.Println("Error: Authorization header is missing")
+		return
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	var currentUser *model.UserIncidental
+	currentUser, err = redis_utils.GetUserFromRedis(uid)
+
+	if err != nil {
+		currentUser, err = user_utils.FetchUser(uid)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			response := map[string]string{"err": err.Error()}
+			json.NewEncoder(w).Encode(response)
+			log.Println("Error:user FetchUser: ", err)
+			log_utils.Logger.Printf("Error:user FetchUser: %v", err)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(currentUser)
 }

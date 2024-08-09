@@ -1,13 +1,17 @@
 package server
 
 import (
-	"github.com/yux77yux/blog-backend/api"
-	"github.com/yux77yux/blog-backend/utils/log_utils"
 	"log"
 	"net/http"
+
+	"github.com/yux77yux/blog-backend/api"
+	"github.com/yux77yux/blog-backend/utils/log_utils"
+	"github.com/yux77yux/blog-backend/utils/redis_utils"
 )
 
 func Server() {
+	go redis_utils.ScheduleCleanup()
+
 	mux := http.NewServeMux()
 	api.UserHandlers(mux)
 

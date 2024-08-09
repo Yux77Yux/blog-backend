@@ -93,4 +93,20 @@ CREATE TABLE if not exists article(
 		log.Fatal(err)
 		log_utils.Logger.Printf("create article table failure: %v", err)
 	}
+	/*
+		query = `
+		CREATE VIEW if not exists view_user AS
+		SELECT
+		user_incidental.uid AS uid,
+		user_incidental.name AS name,
+		user_incidental.bio AS bio,
+		user_incidental.profile AS profile,
+		user_incidental.popularity AS popularity
+
+		FROM user_incidental
+		`
+		if _, err := db.Exec(query); err != nil {
+			log.Fatal(err)
+			log_utils.Logger.Printf("create article table failure: %v", err)
+		}*/
 }

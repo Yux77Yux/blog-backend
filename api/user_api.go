@@ -8,6 +8,7 @@ import (
 
 func UserHandlers(mux *http.ServeMux) {
 	mux.Handle("/api/user/sign-in", config.CorsMiddleware(http.HandlerFunc(user.SignIn)))
+	mux.Handle("/api/user/token-sign-in", config.CorsMiddleware(http.HandlerFunc(user.AutoSignIn)))
 	mux.Handle("/api/user/sign-up", config.CorsMiddleware(http.HandlerFunc(user.SignUp)))
 	mux.Handle("/api/user/sign-out", config.CorsMiddleware(http.HandlerFunc(user.SignOut)))
 	mux.Handle("/api/user/fetch-user", config.CorsMiddleware(http.HandlerFunc(user.FetchUser)))
